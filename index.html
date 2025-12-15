@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Поиск вузов</title>
 
-    <!-- Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
     <style>
@@ -19,7 +18,7 @@
             padding: 20px;
             background: linear-gradient(135deg, #667eea, #764ba2);
             min-height: 100vh;
-            color: white;
+            color: #fff;
         }
 
         .container {
@@ -32,7 +31,7 @@
             margin-bottom: 10px;
         }
 
-        p.subtitle {
+        .subtitle {
             text-align: center;
             opacity: 0.9;
             margin-bottom: 30px;
@@ -89,30 +88,34 @@
             text-align: center;
             opacity: 0.95;
         }
+
+        .parsed {
+            margin-top: 10px;
+            font-size: 14px;
+            opacity: 0.9;
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h1>Поиск вузов</h1>
-    <p class="subtitle">Введите запрос и отправьте его в бота</p>
+    <div class="subtitle">Введите запрос в свободной форме</div>
 
     <div class="card">
         <div class="input-group">
-            <input type="text" id="searchInput" placeholder="Например: балл 210 математика">
+            <input type="text" id="searchInput" placeholder="Например: математика балл 220 бюджет 50">
             <button id="searchBtn">Найти</button>
         </div>
 
         <div class="examples">
-            <div class="example" onclick="setExample('балл 210')">балл 210</div>
-            <div class="example" onclick="setExample('математика')">математика</div>
-            <div class="example" onclick="setExample('бюджет 100')">бюджет 100</div>
-            <div class="example" onclick="setExample('рейтинг 8')">рейтинг 8</div>
+            <div class="example" onclick="setExample('математика балл 220')">математика балл 220</div>
+            <div class="example" onclick="setExample('балл 200 бюджет 100')">балл 200 бюджет 100</div>
+            <div class="example" onclick="setExample('рейтинг 8 физика')">рейтинг 8 физика</div>
         </div>
 
-        <div class="status" id="statusText">
-            Введите запрос и нажмите «Найти»
-        </div>
+        <div class="status" id="statusText">Введите запрос и нажмите «Найти»</div>
+        <div class="parsed" id="parsedText"></div>
     </div>
 </div>
 
@@ -124,21 +127,53 @@
     tg.MainButton.color = '#2cab37';
     tg.MainButton.hide();
 
-    let currentQuery = '';
-
     const input = document.getElementById('searchInput');
     const button = document.getElementById('searchBtn');
     const status = document.getElementById('statusText');
+    const parsed = document.getElementById('parsedText');
+
+    let currentQuery = '';
+
+    function normalizeQuery(text) {
+        const t = text.toLowerCase();
+
+        const score = t.match(/балл\s*(\d+)/);
+        const budget = t.match(/бюджет\s*(\d+)/);
+        const rating = t.match(/рейтинг\s*(\d+(?:\.\d+)?)/);
+
+        const subjects = [
+            'математика', 'информатика', 'физика', 'химия', 'биология',
+            'история', 'обществознание', 'литература', 'английский'
+        ];
+
+        const subject = subjects.find(s => t.includes(s));
+
+        const parts = [];
+        if (score) parts.push(`балл ${score[1]}`);
+        if (budget) parts.push(`бюджет ${budget[1]}`);
+        if (rating) parts.push(`рейтинг ${rating[1]}`);
+        if (subject) parts.push(subject);
+
+        return parts.join(' ');
+    }
 
     function prepareQuery() {
-        currentQuery = input.value.trim();
+        const raw = input.value.trim();
 
-        if (!currentQuery) {
+        if (!raw) {
             alert('Введите запрос');
             return;
         }
 
-        status.innerHTML = `Запрос подготовлен:<br><strong>${currentQuery}</strong><br><br>Нажмите зелёную кнопку ниже`;
+        currentQuery = normalizeQuery(raw);
+
+        if (!currentQuery) {
+            alert('Не удалось распознать запрос');
+            return;
+        }
+
+        status.innerHTML = 'Запрос обработан приложением';
+        parsed.innerHTML = `Распознано: <strong>${currentQuery}</strong>`;
 
         tg.MainButton.setText(`Найти: "${currentQuery}"`);
         tg.MainButton.show();
@@ -146,13 +181,11 @@
 
     button.addEventListener('click', prepareQuery);
 
-    input.addEventListener('keypress', function (e) {
-        if (e.key === 'Enter') {
-            prepareQuery();
-        }
+    input.addEventListener('keypress', e => {
+        if (e.key === 'Enter') prepareQuery();
     });
 
-    Telegram.WebApp.onEvent('mainButtonClicked', function () {
+    Telegram.WebApp.onEvent('mainButtonClicked', () => {
         tg.sendData(currentQuery);
         tg.MainButton.setText('Отправлено');
         setTimeout(() => tg.close(), 800);
